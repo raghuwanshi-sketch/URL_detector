@@ -1,1 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL Scan // Phishing Detector</title>
+<style>
+  :root{
+    --bg:#0B1120;
+    --panel:#111A2E;
+    --panel-2:#0E1626;
+    --line:#223050;
+    --text:#E6EDF5;
+    --muted:#7C8BA0;
+    --amber:#F2A93B;
+    --danger:#E5484D;
+    --safe:#2DD4BF;
+    --mono: 'Courier New', ui-monospace, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  }
 
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #14213E 0%, transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:48px 20px;
+  }
+
+  .wrap{
+    width:100%;
+    max-width:720px;
+  }
+
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:2px;
+    color:var(--amber);
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+
+  .eyebrow::before{
+    content:'';
+    width:8px; height:8px;
+    background:var(--amber);
+    border-radius:50%;
+    box-shadow:0 0 8px var(--amber);
+    animation:pulse 1.8s infinite;
+  }
+
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.35; }
+  }
+
+  h1{
+    font-family:var(--mono);
+    font-size:28px;
+    line-height:1.3;
+    margin:0 0 6px;
+    letter-spacing:-0.5px;
+  }
+
+  .sub{
+    color:var(--muted);
+    font-size:14px;
+    margin:0 0 32px;
+    max-width:52ch;
+  }
+
+  .panel{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:22px;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .panel-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    margin-bottom:16px;
+  }
+
+  .dots{ display:flex; gap:6px; }
+  .dots span{ width:8px; height:8px; border-radius:50%; background:var(--line); }
+
+  .input-row{
+    display:flex;
+    gap:10px;
+  }
+
+  input[type=text]{
+    flex:1;
+    background:#0A1120;
+    border:1px solid var(--line);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:14px;
+    padding:13px 14px;
+    border-radius:7px;
+    outline:none;
+    transition:border-color .15s ease;
+  }
+
+  input[type=text]:focus{
+    border-color:var(--amber);
+  }
+
+  input[type=text]::placeholder{ color:#4A5A73; }
+
+  button{
+    font-family:var(--mono);
+    font-size:13px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    background:var(--amber);
+    color:#1A1200;
+    border:none;
+    border-radius:7px;
+    padding:0 20px;
+    cursor:pointer;
+    font-weight:700;
+    transition:transform .1s ease, background .15s ease;
+  }
+
+  button:hover{ background:#FFC15E; }
+  button:active{ transform:scale(0.97); }
+
+  .scan-line{
+    height:2px;
+    width:100%;
+    margin-top:18px;
+    background:var(--line);
+    position:relative;
+    overflow:hidden;
+    border-radius:2px;
+    display:none;
+  }
+
+  .scan-line.active{ display:block; }
+
+  .scan-line::after{
+    content:'';
+    position:absolute;
+    top:0; left:-40%;
+    width:40%; height:100%;
+    background:linear-gradient(90deg, transparent, var(--amber), transparent);
+    animation:sweep 1.1s linear infinite;
+  }
+
+  @keyframes sweep{
+    from{ left:-40%; }
+    to{ left:100%; }
+  }
+
+  .results{
+    margin-top:22px;
+    display:none;
+  }
+
+  .results.show{ display:block; animation:fadein .25s ease; }
+
+  @keyframes fadein{
+    from{ opacity:0; transform:translateY(4px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .verdict{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:16px 18px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    margin-bottom:18px;
+  }
+
+  .verdict-badge{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    padding:6px 12px;
+    border-radius:5px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .v-safe{ background:rgba(45,212,191,.12); color:var(--safe); border:1px solid rgba(45,212,191,.35); }
+  .v-caution{ background:rgba(242,169,59,.12); color:var(--amber); border:1px solid rgba(242,169,59,.35); }
+  .v-danger{ background:rgba(229,72,77,.12); color:var(--danger); border:1px solid rgba(229,72,77,.35); }
+
+  .verdict-text{
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .score-track{
+    height:6px;
+    background:var(--line);
+    border-radius:4px;
+    overflow:hidden;
+    margin:14px 0 22px;
+  }
+
+  .score-fill{
+    height:100%;
+    border-radius:4px;
+    transition:width .5s ease;
+  }
+
+  .rules-title{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 12px;
+  }
+
+  .rule{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:11px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13.5px;
+  }
+
+  .rule:last-child{ border-bottom:none; }
+
+  .rule-icon{
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:13px;
+    width:20px;
+    height:20px;
+    min-width:20px;
+    border-radius:5px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-top:1px;
+  }
+
+  .flag-hit .rule-icon{ background:rgba(229,72,77,.15); color:var(--danger); }
+  .flag-clear .rule-icon{ background:rgba(45,212,191,.12); color:var(--safe); }
+
+  .rule-body strong{ display:block; color:var(--text); font-weight:600; }
+  .rule-body span{ color:var(--muted); font-size:12.5px; }
+
+  .footer-note{
+    margin-top:26px;
+    font-size:11.5px;
+    color:#4A5A73;
+    line-height:1.6;
+    font-family:var(--mono);
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .eyebrow::before, .scan-line::after{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="eyebrow">Live rule engine</div>
+  <h1>Phishing URL Detector</h1>
+  <p class="sub">Paste a link below. It's checked against known phishing signals — no data leaves your browser, everything runs locally in JavaScript.</p>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span>scan_input.url</span>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
+
+    <div class="input-row">
+      <input type="text" id="urlInput" placeholder="e.g. http://paypa1-secure-login.tk/verify?acct=1" />
+      <button id="scanBtn">Scan</button>
+    </div>
+
+    <div class="scan-line" id="scanLine"></div>
+
+    <div class="results" id="results">
+      <div class="verdict">
+        <div class="verdict-badge" id="verdictBadge">--</div>
+        <div class="verdict-text" id="verdictText">--</div>
+      </div>
+
+      <div class="score-track"><div class="score-fill" id="scoreFill"></div></div>
+
+      <p class="rules-title">Signal breakdown</p>
+      <div id="ruleList"></div>
+    </div>
+  </div>
+
+  <p class="footer-note">
+    RULE-BASED ENGINE // heuristics only, not a guarantee of safety or maliciousness.<br>
+    Always verify unfamiliar links independently before entering credentials.
+  </p>
+</div>
+
+<script>
+const SUSPICIOUS_TLDS = ['tk','ml','ga','cf','gq','xyz','top','work','click','link','info','biz','loan','win','review'];
+const SHORTENERS = ['bit.ly','tinyurl.com','t.co','goo.gl','ow.ly','is.gd','buff.ly','rebrand.ly','cutt.ly','shorte.st'];
+const BRAND_KEYWORDS = ['paypal','amazon','apple','microsoft','google','facebook','netflix','bankofamerica','wellsfargo','chase','instagram','whatsapp','irs','dhl','fedex'];
+const SENSITIVE_WORDS = ['login','verify','secure','account','update','confirm','password','signin','banking','suspended','unlock','recover'];
+
+function analyzeUrl(raw){
+  const rules = [];
+  let score = 0;
+  let hostname = '';
+  let pathname = '';
+  let fullLower = raw.toLowerCase();
+  let parsed = null;
+
+  try{
+    parsed = new URL(raw.match(/^https?:\/\//i) ? raw : 'http://' + raw);
+    hostname = parsed.hostname.toLowerCase();
+    pathname = parsed.pathname + parsed.search;
+  }catch(e){
+    hostname = raw.toLowerCase();
+    pathname = '';
+  }
+
+  // 1. Uses HTTPS
+  const isHttps = /^https:\/\//i.test(raw);
+  rules.push({
+    hit: !isHttps,
+    weight: 8,
+    title: isHttps ? 'Uses HTTPS' : 'No HTTPS encryption',
+    detail: isHttps ? 'Connection would be encrypted.' : 'Link uses plain HTTP — data sent isn\'t encrypted in transit.'
+  });
+
+  // 2. IP address instead of domain name
+  const isIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+  rules.push({
+    hit: isIP,
+    weight: 22,
+    title: isIP ? 'Raw IP address used as domain' : 'Domain is not a raw IP',
+    detail: isIP ? 'Legit sites almost never use a bare IP instead of a domain name.' : 'No IP-address hostname detected.'
+  });
+
+  // 3. '@' symbol in URL (browser ignores everything before it)
+  const hasAt = raw.includes('@');
+  rules.push({
+    hit: hasAt,
+    weight: 20,
+    title: hasAt ? 'Contains "@" symbol' : 'No "@" symbol trick',
+    detail: hasAt ? 'Text before "@" is often used to disguise the real destination domain.' : 'URL does not use the "@" redirection trick.'
+  });
+
+  // 4. Excessive URL length
+  const isLong = raw.length > 75;
+  rules.push({
+    hit: isLong,
+    weight: 8,
+    title: isLong ? `Unusually long URL (${raw.length} chars)` : 'Reasonable URL length',
+    detail: isLong ? 'Long URLs are sometimes used to hide suspicious parameters or obscure the real domain.' : `Length is ${raw.length} characters.`
+  });
+
+  // 5. Excessive subdomains / dots
+  const dotCount = (hostname.match(/\./g) || []).length;
+  const manySubdomains = dotCount > 3;
+  rules.push({
+    hit: manySubdomains,
+    weight: 12,
+    title: manySubdomains ? 'Excessive subdomains' : 'Normal subdomain depth',
+    detail: manySubdomains ? `Domain has ${dotCount} dots — deep subdomain chains are a common obfuscation tactic.` : `Domain has ${dotCount} dot(s), which is typical.`
+  });
+
+  // 6. Suspicious / high-risk TLD
+  const tld = hostname.split('.').pop();
+  const suspiciousTld = SUSPICIOUS_TLDS.includes(tld);
+  rules.push({
+    hit: suspiciousTld,
+    weight: 14,
+    title: suspiciousTld ? `Uncommon TLD ".${tld}"` : 'No flagged TLD',
+    detail: suspiciousTld ? 'This top-level domain is frequently abused for cheap, disposable phishing sites.' : 'Top-level domain is not on the commonly-abused list.'
+  });
+
+  // 7. URL shortener
+  const isShortener = SHORTENERS.some(s => hostname.includes(s));
+  rules.push({
+    hit: isShortener,
+    weight: 10,
+    title: isShortener ? 'URL shortener detected' : 'Not a known shortener',
+    detail: isShortener ? 'Shorteners hide the real destination until you click.' : 'Destination domain is visible, not masked by a shortener.'
+  });
+
+  // 8. Hyphens in domain (often used to fake brand names, e.g. paypal-secure.com)
+  const hyphenCount = (hostname.match(/-/g) || []).length;
+  const manyHyphens = hyphenCount >= 2;
+  rules.push({
+    hit: manyHyphens,
+    weight: 10,
+    title: manyHyphens ? 'Multiple hyphens in domain' : 'Few or no hyphens in domain',
+    detail: manyHyphens ? 'Multiple hyphens are often used to mimic a trusted brand name.' : 'Hyphen usage looks normal.'
+  });
+
+  // 9. Brand name mentioned but not as the actual registered domain
+  const brandMatch = BRAND_KEYWORDS.find(b => fullLower.includes(b));
+  const domainRoot = hostname.split('.').slice(-2, -1)[0] || '';
+  const brandSpoof = brandMatch && !domainRoot.includes(brandMatch);
+  rules.push({
+    hit: !!brandSpoof,
+    weight: 20,
+    title: brandSpoof ? `Mentions "${brandMatch}" outside its real domain` : 'No brand impersonation detected',
+    detail: brandSpoof ? 'A well-known brand name appears in the URL but isn\'t the actual domain — classic impersonation pattern.' : 'No known brand name found misused in the URL.'
+  });
+
+  // 10. Sensitive/urgency keywords
+  const sensitiveHit = SENSITIVE_WORDS.filter(w => fullLower.includes(w));
+  rules.push({
+    hit: sensitiveHit.length > 0,
+    weight: 9,
+    title: sensitiveHit.length ? `Sensitive keyword(s): ${sensitiveHit.slice(0,3).join(', ')}` : 'No urgency/sensitive keywords',
+    detail: sensitiveHit.length ? 'Words like these are commonly used to pressure users into acting fast.' : 'URL text doesn\'t contain common phishing-bait words.'
+  });
+
+  // 11. Punycode / homograph attack
+  const isPunycode = hostname.includes('xn--');
+  rules.push({
+    hit: isPunycode,
+    weight: 18,
+    title: isPunycode ? 'Punycode domain (possible homograph attack)' : 'No punycode encoding',
+    detail: isPunycode ? 'Encoded international characters can visually mimic trusted domains (e.g. "аpple.com" using Cyrillic а).' : 'Domain uses standard ASCII characters.'
+  });
+
+  // 12. Non-standard port specified
+  const hasPort = !!(parsed && parsed.port);
+  rules.push({
+    hit: hasPort,
+    weight: 7,
+    title: hasPort ? `Custom port specified (:${parsed.port})` : 'Standard port',
+    detail: hasPort ? 'Legitimate sites rarely need to specify a custom port in the link.' : 'No unusual port in the URL.'
+  });
+
+  score = rules.reduce((sum, r) => sum + (r.hit ? r.weight : 0), 0);
+  score = Math.min(score, 100);
+
+  return { rules, score };
+}
+
+function render(raw){
+  const { rules, score } = analyzeUrl(raw);
+
+  const results = document.getElementById('results');
+  const verdictBadge = document.getElementById('verdictBadge');
+  const verdictText = document.getElementById('verdictText');
+  const scoreFill = document.getElementById('scoreFill');
+  const ruleList = document.getElementById('ruleList');
+  const verdictBox = document.querySelector('.verdict');
+
+  let level, cls, msg;
+  if(score >= 45){
+    level = 'High risk'; cls = 'v-danger';
+    msg = 'Multiple strong phishing signals detected. Avoid entering any credentials or personal info.';
+  } else if(score >= 20){
+    level = 'Suspicious'; cls = 'v-caution';
+    msg = 'Some warning signs present. Proceed with caution and verify the source independently.';
+  } else {
+    level = 'Likely safe'; cls = 'v-safe';
+    msg = 'No major phishing indicators found in this URL\'s structure.';
+  }
+
+  verdictBox.className = 'verdict';
+  verdictBadge.className = 'verdict-badge ' + cls;
+  verdictBadge.textContent = level;
+  verdictText.textContent = msg;
+
+  scoreFill.style.width = score + '%';
+  scoreFill.style.background = score >= 45 ? 'var(--danger)' : score >= 20 ? 'var(--amber)' : 'var(--safe)';
+
+  ruleList.innerHTML = '';
+  rules.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'rule ' + (r.hit ? 'flag-hit' : 'flag-clear');
+    row.innerHTML = `
+      <div class="rule-icon">${r.hit ? '!' : '✓'}</div>
+      <div class="rule-body">
+        <strong>${r.title}</strong>
+        <span>${r.detail}</span>
+      </div>
+    `;
+    ruleList.appendChild(row);
+  });
+
+  results.classList.add('show');
+}
+
+const btn = document.getElementById('scanBtn');
+const input = document.getElementById('urlInput');
+const scanLine = document.getElementById('scanLine');
+const results = document.getElementById('results');
+
+function runScan(){
+  const raw = input.value.trim();
+  if(!raw) return;
+
+  results.classList.remove('show');
+  scanLine.classList.add('active');
+  btn.disabled = true;
+  btn.textContent = 'Scanning';
+
+  setTimeout(() => {
+    scanLine.classList.remove('active');
+    btn.disabled = false;
+    btn.textContent = 'Scan';
+    render(raw);
+  }, 650);
+}
+
+btn.addEventListener('click', runScan);
+input.addEventListener('keydown', e => { if(e.key === 'Enter') runScan(); });
+</script>
+
+</body>
+</html>
